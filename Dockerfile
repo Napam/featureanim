@@ -1,0 +1,41 @@
+FROM pytorch/pytorch:1.9.0-cuda11.1-cudnn8-runtime
+
+#gcc since some Python packages requires compiling
+#graphviz for python package torchviz to work (backward graph visualization)
+#libgl1-mesa-glx and libglib2.0-0 is for cv2 to work
+RUN apt-get update && apt-get install -y \
+    gcc \
+    libgl1-mesa-glx \
+    libglib2.0-0 \ 
+    screen \
+    sqlite3 \
+    vim \
+&& apt-get -y autoremove && rm -rf /var/lib/apt/lists/*
+
+COPY requirements.txt /tmp/
+RUN pip --no-cache-dir install -r /tmp/requirements.txt
+
+# Remove build tools
+RUN apt-get -y --purge autoremove gcc
+
+# Common bashrc
+COPY bashrc /etc/bash.bashrc
+# Assert everyone can use bashrc
+RUN chmod a+rwx /etc/bash.bashrc
+
+# Sets home for EVERYBODY
+WORKDIR /project
+ENV HOME=/project
+
+# Configure user
+ARG user=kanyewest
+ARG uid=1000
+ARG gid=1000
+
+RUN groupadd -g $gid stud && \ 
+    useradd --shell /bin/bash -u $uid -g $gid $user && \
+    usermod -a -G sudo $user && \
+    usermod -a -G root $user && \
+    passwd -d $user
+
+CMD ["/bin/bash"]
