@@ -1,9 +1,9 @@
+from audioop import bias
 import torch
 from torch import nn 
 import warnings
+from itertools import chain
 
-from torch._C import BenchmarkExecutionStats
-from torch.nn.modules.conv import Conv2d
 warnings.filterwarnings("ignore", category=UserWarning)
 
 
@@ -33,7 +33,7 @@ class BenjaBlock(nn.Module):
         return H
 
 
-class Benja(nn.Module):
+class Mamiew(nn.Module):
     def __init__(self):
         super().__init__()
 
@@ -45,56 +45,33 @@ class Benja(nn.Module):
             BenjaBlock(64, 64),
             nn.MaxPool2d(kernel_size=2),
         )
+
+        self.fcs = nn.Sequential(
+            nn.Linear(7*7*64, 1024, bias=False),
+            nn.ReLU(),
+            nn.BatchNorm1d(1024),
+            *chain.from_iterable([
+                (nn.Linear(1024, 1024, bias=False),nn.ReLU(),nn.BatchNorm1d(1024)) 
+                for i in range(1)
+            ])
+            # *chain.from_iterable([
+            #     (nn.Linear(i,i-2, bias=False),nn.ReLU(),nn.BatchNorm1d(i-2)) 
+            #     for i in range(128, 2, -2)
+            # ])
+        )
         
-        self.fc1 = nn.Linear(7*7*64, 128, bias=False)
-        self.bn1 = nn.BatchNorm1d(128)
-        self.fc2 = nn.Linear(128, 128, bias=False)
-        self.bn2 = nn.BatchNorm1d(128)
-        self.fc3 = nn.Linear(128, 16)
-        self.fc4 = nn.Linear(16, 10)
+        self.fc1 = nn.Linear(1024, 8)
+        self.fc2 = nn.Linear(8, 10)
         
-        self.relu = nn.ReLU()
         self.sigmoid = nn.Sigmoid()
         self.tanh = nn.Tanh()
 
     def forward(self, X: torch.Tensor):
         """Returns predicitions, and latest latent representation"""
         H = self.convs(X)
-        H = self.fc1(H.view(len(X), -1))
-        H = self.bn1(self.relu(H))
-        H = self.fc2(H)
-        H = self.bn2(self.relu(H))
-        H = self.tanh(self.fc3(H))
-        return self.sigmoid(self.fc4(H)), H
-
-
-# class Benja(nn.Module):
-#     def __init__(self):
-#         super().__init__()
-
-#         self.convs = nn.Sequential(
-#             nn.Conv2d(1, 32, 3, padding='same'),
-#             nn.ReLU(),
-#             nn.Conv2d(32, 64, 3, padding='same'),
-#             nn.ReLU(),
-#             nn.MaxPool2d(2),
-#             nn.Flatten(),
-#             nn.Linear(14*14*64, 128)
-#         )
-
-#         self.fc2 = nn.Linear(128, 128)
-#         self.fc3 = nn.Linear(128, 2)
-#         self.fc4 = nn.Linear(2, 10)
-
-#         self.relu = nn.ReLU()
-#         self.sigmoid = nn.Sigmoid()
-
-#     def forward(self, X: torch.Tensor):
-#         """Returns predicitions, and latest latent representation"""
-#         H = self.convs(X)
-#         H = self.relu(self.fc2(H))
-#         H = self.fc3(H)
-#         return self.sigmoid(self.fc4(H)), H.detach()
+        H = self.fcs(H.view(len(X), -1))
+        H = self.tanh(self.fc1(H))
+        return self.sigmoid(self.fc2(H)), H
 
 
 def oneVsAll(y_pred: torch.Tensor, y_true: torch.Tensor) -> torch.Tensor:
@@ -107,4 +84,4 @@ def oneVsAll(y_pred: torch.Tensor, y_true: torch.Tensor) -> torch.Tensor:
     
 if __name__ == '__main__':
     X = torch.randint(0, 10, size=[4,1,28,28], dtype=torch.float32)
-    model = Benja()
+    model = Mamiew()
